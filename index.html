@@ -23,7 +23,18 @@
   <div id="cesiumContainer"></div>
 
   <script>
-    const viewer = new Cesium.Viewer('cesiumContainer', { timeline: false, animation: false });
+    // OpenStreetMap ücretsiz harita servisini bağlıyoruz
+    const osm = new Cesium.OpenStreetMapImageryProvider({
+        url : 'https://a.tile.openstreetmap.org/'
+    });
+
+    const viewer = new Cesium.Viewer('cesiumContainer', { 
+        imageryProvider: osm,
+        timeline: false, 
+        animation: false,
+        baseLayerPicker: false
+    });
+    
     viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(32.85, 39.93, 500000.0) });
 
     let mode = null;
