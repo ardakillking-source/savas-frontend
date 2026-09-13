@@ -23,17 +23,89 @@
   <div id="cesiumContainer"></div>
 
   <script>
-    const viewer = new Cesium.Viewer('cesiumContainer', { 
-        baseLayer: new Cesium.ImageryLayer(new Cesium.OpenStreetMapImageryProvider({
-            url : 'https://a.tile.openstreetmap.org/'
-        })),
-        timeline: false, 
-        animation: false,
-        baseLayerPicker: false
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      imageryProvider: new Cesium.ArcGisMapServerImageryProvider({
+        url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
+      }),
+      timeline: false,
+      animation: false,
+      baseLayerPicker: false
     });
-    
+
     viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(32.85, 39.93, 500000.0) });
 
+    let mode = null;
+    let samData = null;
+    let jetData = null;
+
+    function setMode(m) { mode = m; }
+
+    const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    handler.setInputAction(function (click) {
+      if (!mode) return;
+      const cartesian = viewer.camera.pickEllipsoid(click.position);
+      if (!cartesian) return;
+
+      const carto = Cesium.Cartographic.fromCartesian(cartesian);
+      const lon = Cesium.Math.toDegrees(carto.longitude);
+      const lat = Cesium.Math.toDegrees(carto.latitude);
+
+      if (mode === 'SAM') {
+        samData = { lat, lon, rangeKm: 150 };
+        viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+          point: { pixelSize: 15, color: Cesium.Color.RED },
+          label: { text: "S-400", pixelOffset: new Cesium.Cartesian2(0, -20) }
+        });
+        document.getElementById('log').innerText = "S-400 Eklendi.";
+      } else if (mode === 'JET') {
+        jetData = { lat, lon, alt: 10000 };
+        viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(lon, lat, 10000),
+          point: { pixelSize: 12, color: Cesium.Color.YELLOW },
+          label: { text: "F-35", pixelOffset: new Cesium.Cartesian2(0, -20) }
+        });
+        document.getElementById('log').innerText = "F-35 Eklendi.";
+      }
+      mode = null;
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    async function checkEngagement() {
+      if (!samData || !jetData) {
+        alert("Önce ekrana dokunarak S-400 ve F-35 ekleyin!");
+        return;
+      }
+
+      document.getElementById('log').innerText = "Hesaplanıyor...";
+      
+      const BACKEND_URL = "https://savas-backend-kx0n.onrender.com/api/v1/simulate-engagement";
+
+      try {
+        const response = await fetch(BACKEND_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sam_lat: samData.lat,
+            sam_lon: samData.lon,
+            sam_range_km: samData.rangeKm,
+            jet_lat: jetData.lat,
+            jet_lon: jetData.lon,
+            jet_alt_m: jetData.alt
+          })
+        });
+
+        const data = await response.json();
+        document.getElementById('log').innerHTML = 
+          `Mesafe: <b>${data.distance_km} km</b><br>` +
+          `Menzilde mi?: <b>${data.in_range ? 'EVET' : 'HAYIR'}</b><br>` +
+          `Vurulma Olasılığı: <b>%${data.kill_probability_percent}</b>`;
+      } catch (err) {
+        document.getElementById('log').innerText = "Hata oluştu! Bağlantıyı kontrol edin.";
+      }
+    }
+  </script>
+</body>
+</html>
     let mode = null;
     let samData = null;
     let jetData = null;
